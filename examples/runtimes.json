@@ -1,0 +1,64 @@
+{
+  "runtimes": {
+    "pi-ax": {
+      "command": "/absolute/path/to/ax-agentconnect",
+      "args": [
+        "--server",
+        "127.0.0.1:18080",
+        "--router",
+        "127.0.0.1:18082",
+        "--atespace",
+        "default",
+        "--task",
+        "pi-agent",
+        "--acp-cwd",
+        "/workspace/work",
+        "--",
+        "/usr/local/bin/pi-acp"
+      ],
+      "env": [],
+      "externalExecution": true,
+      "sessionMcpServers": "unsupported"
+    },
+    "codex-ax": {
+      "command": "/absolute/path/to/ax-agentconnect",
+      "args": [
+        "--server",
+        "127.0.0.1:18080",
+        "--router",
+        "127.0.0.1:18082",
+        "--atespace",
+        "default",
+        "--task",
+        "codex-agent",
+        "--acp-cwd",
+        "/workspace/work",
+        "--",
+        "/usr/local/bin/codex-acp"
+      ],
+      "env": [],
+      "externalExecution": true,
+      "sessionMcpServers": "unsupported"
+    },
+    "claude-ax": {
+      "command": "/absolute/path/to/ax-agentconnect",
+      "args": [
+        "--server",
+        "127.0.0.1:18080",
+        "--router",
+        "127.0.0.1:18082",
+        "--atespace",
+        "default",
+        "--task",
+        "claude-agent",
+        "--acp-cwd",
+        "/workspace/work",
+        "--",
+        "/usr/local/bin/claude-agent-acp"
+      ],
+      "env": [],
+      "externalExecution": true,
+      "sessionMcpServers": "unsupported"
+    }
+  }
+}
