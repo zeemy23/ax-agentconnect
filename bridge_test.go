@@ -47,12 +47,14 @@ const (
 	simulatedStop
 	simulatedMissingExit
 	simulatedStartError
+	simulatedEscalate
 )
 
 type simulatedProcess struct {
 	ateenvv1alpha.UnimplementedProcessServiceServer
 	mode          simulatedProcessMode
 	startErr      error
+	signalErr     error
 	expectedActor string
 
 	mu          sync.Mutex
@@ -103,7 +105,7 @@ func (s *simulatedProcess) StreamProcessOutput(req *ateenvv1alpha.StreamProcessO
 		}
 		return nil
 	}
-	if s.mode == simulatedStop {
+	if s.mode == simulatedStop || s.mode == simulatedEscalate {
 		<-s.signalDone
 		return stream.Send(&ateenvv1alpha.ProcessOutput{
 			Output: &ateenvv1alpha.ProcessOutput_Exit{Exit: &ateenvv1alpha.Process{ProcessId: "simulated-process", State: ateenvv1alpha.ProcessState_PROCESS_STATE_EXITED, ExitCode: 130}},
@@ -158,7 +160,14 @@ func (s *simulatedProcess) SignalProcess(ctx context.Context, req *ateenvv1alpha
 	s.mu.Lock()
 	s.signalCalls++
 	s.lastSignal = req.GetSignal()
+	signalErr := s.signalErr
 	s.mu.Unlock()
+	if signalErr != nil {
+		return nil, signalErr
+	}
+	if s.mode == simulatedEscalate && req.GetSignal() != ateenvv1alpha.Signal_SIGNAL_KILL {
+		return &ateenvv1alpha.Process{ProcessId: req.GetProcessId(), State: ateenvv1alpha.ProcessState_PROCESS_STATE_RUNNING}, nil
+	}
 	s.signalOnce.Do(func() { close(s.signalDone) })
 	return &ateenvv1alpha.Process{ProcessId: req.GetProcessId(), State: ateenvv1alpha.ProcessState_PROCESS_STATE_RUNNING}, nil
 }
@@ -255,6 +264,20 @@ func TestSimulatedStopSignalsRemoteProcess(t *testing.T) {
 		}{code, err}
 	}()
 
+	deadline := time.After(5 * time.Second)
+	for {
+		process.mu.Lock()
+		started := process.startCalls > 0
+		process.mu.Unlock()
+		if started {
+			break
+		}
+		select {
+		case <-deadline:
+			t.Fatal("timed out waiting for remote start")
+		case <-time.After(time.Millisecond):
+		}
+	}
 	signals <- os.Interrupt
 	select {
 	case got := <-result:
@@ -318,12 +341,12 @@ func TestLoopbackDefaultRejectsNonLoopback(t *testing.T) {
 	}
 }
 
-func TestEndpointHostSupportsLoopbackURL(t *testing.T) {
-	host, err := endpointHost("http://127.0.0.1:8080/")
-	if err != nil || host != "127.0.0.1" {
-		t.Fatalf("endpointHost() = %q, %v", host, err)
+func TestEndpointSupportsLoopbackURL(t *testing.T) {
+	endpoint, err := parseEndpoint("http://127.0.0.1:8080")
+	if err != nil || endpoint.host != "127.0.0.1" || endpoint.address != "127.0.0.1:8080" || endpoint.tls {
+		t.Fatalf("parseEndpoint() = %+v, %v", endpoint, err)
 	}
-	if normalizeEndpoint("https://localhost:8001/") != "localhost:8001" {
-		t.Fatalf("normalizeEndpoint() did not strip URL wrapper")
+	if _, err := parseEndpoint("https://localhost:8001/"); err == nil {
+		t.Fatal("URL path accepted")
 	}
 }
