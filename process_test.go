@@ -302,6 +302,48 @@ func TestCancellationWithBlockedOutputAndFailedCleanup(t *testing.T) {
 	}
 }
 
+func TestLocalProcessWatchdogBoundsBlockedOutputAndInput(t *testing.T) {
+	_, process, address := simulatedServer(t, simulatedMissingExit, nil)
+	cfg := simulatedConfig(address)
+	cfg.ProcessTimeout = 250 * time.Millisecond
+	cfg.ShutdownTimeout = 50 * time.Millisecond
+	stdin, stdinWriter := io.Pipe()
+	writer := &blockingWriter{entered: make(chan struct{}), release: make(chan struct{})}
+	defer func() {
+		close(writer.release)
+		_ = stdinWriter.Close()
+	}()
+
+	done := make(chan error, 1)
+	started := time.Now()
+	go func() {
+		_, err := runWithSignals(context.Background(), cfg, stdin, writer, io.Discard, nil)
+		done <- err
+	}()
+	select {
+	case <-writer.entered:
+	case <-time.After(3 * time.Second):
+		t.Fatal("writer not reached")
+	}
+	select {
+	case err := <-done:
+		if err == nil || !strings.Contains(err.Error(), "local process timeout") {
+			t.Fatalf("error = %v, want local process timeout", err)
+		}
+		if elapsed := time.Since(started); elapsed > 4*time.Second {
+			t.Fatalf("watchdog returned after %s", elapsed)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("local watchdog did not bound blocked I/O")
+	}
+
+	process.mu.Lock()
+	defer process.mu.Unlock()
+	if process.signalCalls != 1 || process.lastSignal != ateenvv1alpha.Signal_SIGNAL_KILL {
+		t.Fatalf("signals = %d/%v, want one SIGKILL", process.signalCalls, process.lastSignal)
+	}
+}
+
 type blockingWriter struct{ entered, release chan struct{} }
 
 func (w *blockingWriter) Write(data []byte) (int, error) {
