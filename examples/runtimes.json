@@ -3,6 +3,8 @@
     "pi-ax": {
       "command": "/absolute/path/to/ax-agentconnect",
       "args": [
+        "--state-dir",
+        "/var/lib/ax-agentconnect",
         "--server",
         "127.0.0.1:18080",
         "--router",
@@ -23,6 +25,8 @@
     "codex-ax": {
       "command": "/absolute/path/to/ax-agentconnect",
       "args": [
+        "--state-dir",
+        "/var/lib/ax-agentconnect",
         "--server",
         "127.0.0.1:18080",
         "--router",
@@ -43,6 +47,8 @@
     "claude-ax": {
       "command": "/absolute/path/to/ax-agentconnect",
       "args": [
+        "--state-dir",
+        "/var/lib/ax-agentconnect",
         "--server",
         "127.0.0.1:18080",
         "--router",
@@ -60,5 +66,11 @@
       "externalExecution": true,
       "sessionMcpServers": "unsupported"
     }
+  },
+  "security": {
+    "requireSandbox": false
+  },
+  "limits": {
+    "agentStartAttempts": 1
   }
 }
